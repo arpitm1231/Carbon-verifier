@@ -1,0 +1,5 @@
+earthengine-api
+geemap
+streamlit
+pandas
+fpdf2
