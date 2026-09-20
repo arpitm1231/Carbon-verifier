@@ -34,32 +34,66 @@ st.markdown(
     f"""
     <style>
     .stApp {{
-        background-image: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
+        background-image: linear-gradient(rgba(4, 20, 10, 0.78), rgba(4, 20, 10, 0.85)),
             url('{FOREST_BG_URL}');
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }}
     .main .block-container {{
-        background-color: rgba(255, 255, 255, 0.92);
+        background-color: rgba(17, 24, 21, 0.92);
         border-radius: 16px;
         padding: 2.2rem 2.5rem;
         margin-top: 1.5rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }}
-    h1, h2, h3 {{ color: #14532d; }}
+    .main .block-container, .main .block-container p,
+    .main .block-container span, .main .block-container label,
+    .main .block-container div {{
+        color: #f1f5f2;
+        font-weight: 600;
+    }}
+    section[data-testid="stSidebar"] {{
+        background-color: rgba(17, 24, 21, 0.95);
+    }}
+    section[data-testid="stSidebar"] * {{
+        color: #f1f5f2 !important;
+        font-weight: 600;
+    }}
+    h1, h2, h3 {{
+        color: #4ade80 !important;
+        font-weight: 800 !important;
+    }}
+    .stTextInput input, .stNumberInput input, .stDateInput input {{
+        background-color: #1f2b25 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        border: 1px solid #4ade80 !important;
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        color: #f1f5f2 !important;
+        font-weight: 700 !important;
+    }}
+    .stTabs [aria-selected="true"] {{
+        color: #4ade80 !important;
+        border-bottom-color: #4ade80 !important;
+    }}
+    .stCaption, .st-emotion-cache-caption {{
+        color: #cbd5c9 !important;
+        font-weight: 500 !important;
+    }}
     .risk-badge {{
         display: inline-block;
         padding: 6px 18px;
         border-radius: 999px;
-        font-weight: 700;
+        font-weight: 800;
         font-size: 1.1rem;
         margin-top: 6px;
     }}
-    .risk-low {{ background-color: #dcfce7; color: #166534; }}
-    .risk-medium {{ background-color: #fef9c3; color: #854d0e; }}
-    .risk-high {{ background-color: #fee2e2; color: #991b1b; }}
-    .risk-unknown {{ background-color: #e5e7eb; color: #374151; }}
+    .risk-low {{ background-color: #22c55e; color: #052e12; }}
+    .risk-medium {{ background-color: #facc15; color: #422006; }}
+    .risk-high {{ background-color: #ef4444; color: #450a0a; }}
+    .risk-unknown {{ background-color: #9ca3af; color: #111827; }}
     footer {{visibility: hidden;}}
     </style>
     """,
@@ -127,6 +161,21 @@ with st.sidebar:
 st.divider()
 
 # ---------------------------------------------------------------------------
+# Project ID — entered once here, shared across both tabs
+# ---------------------------------------------------------------------------
+if "gcp_project_id" not in st.session_state:
+    st.session_state.gcp_project_id = ee_project_id or "carbon-verifier"
+
+st.session_state.gcp_project_id = st.text_input(
+    "🔑 Google Cloud Project ID (required by Earth Engine)",
+    value=st.session_state.gcp_project_id,
+    placeholder="e.g. carbon-verifier-123456",
+    help="Find this at console.cloud.google.com (top project dropdown), or on the Earth Engine registration page. Enter once — it's used for both Single and Batch checks below.",
+)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
 # Helper to render a single result nicely
 # ---------------------------------------------------------------------------
 def render_result(report, key_prefix=""):
@@ -188,7 +237,7 @@ with tab1:
         after_end = st.date_input("End date", value=pd.to_datetime("2024-12-31"), key="ae")
 
     with st.expander("⚙️ Advanced (only if Earth Engine asks for a project id)"):
-        project_id = st.text_input("Google Cloud Project ID (optional)", value="", key="single_project")
+        project_id = st.text_input("Override Project ID for this check (optional)", value="", key="single_project")
 
     if st.button("🔍 Verify Now", type="primary", use_container_width=True):
         with st.spinner("Fetching and analyzing satellite images..."):
@@ -197,7 +246,7 @@ with tab1:
                     lat=lat, lon=lon, acres=acres,
                     before_start=str(before_start), before_end=str(before_end),
                     after_start=str(after_start), after_end=str(after_end),
-                    project=project_id if project_id else ee_project_id,
+                    project=project_id if project_id else (st.session_state.gcp_project_id or ee_project_id),
                     service_account_json=ee_service_account_json,
                 )
             except SystemExit:
@@ -239,7 +288,7 @@ with tab2:
     uploaded_file = st.file_uploader("Upload your CSV file here", type=["csv"])
 
     with st.expander("⚙️ Advanced (only if Earth Engine asks for a project id)"):
-        batch_project_id = st.text_input("Google Cloud Project ID (optional)", value="", key="batch_project")
+        batch_project_id = st.text_input("Override Project ID for this batch (optional)", value="", key="batch_project")
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
@@ -259,7 +308,7 @@ with tab2:
                         lat=float(row["lat"]), lon=float(row["lon"]), acres=float(row["acres"]),
                         before_start=str(row["before_start"]), before_end=str(row["before_end"]),
                         after_start=str(row["after_start"]), after_end=str(row["after_end"]),
-                        project=batch_project_id if batch_project_id else ee_project_id,
+                        project=batch_project_id if batch_project_id else (st.session_state.gcp_project_id or ee_project_id),
                         service_account_json=ee_service_account_json,
                     )
                     report["name"] = row["name"]
